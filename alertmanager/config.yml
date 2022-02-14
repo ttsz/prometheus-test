@@ -1,0 +1,55 @@
+global:
+  slack_api_url: "https://hooks.slack.com/services/A032SJCJCSH"
+
+# Sendgrid SMTP properties.
+  smtp_smarthost: 'smtp.sendgrid.net:587'
+  smtp_from: 'Alertmanager <alertmanager@hostinza.eu>'
+  smtp_auth_username: 'apikey'
+  smtp_auth_password: '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'
+
+route:
+  receiver: mail
+  routes:
+   - match:
+       severity: warning
+     receiver: mail
+
+receivers:
+  - name: mail
+    email_configs:
+    - to: "support@tothsoft.hu"
+      headers:
+        Subject: "Alert ({{ .Status }}): {{ .CommonLabels.severity }} {{ .CommonAnnotations.message }} ({{ .CommonLabels.alertname }})"
+      html: |
+        Greetings,
+        <p>
+        You have the following firing alerts:
+        <ul>
+        {{ range .Alerts }}
+        <li>{{.Labels.alertname}} on {{.Labels.instance}}</li>
+        <li>Labels:</li>
+        <li>{{ range .Labels.SortedPairs }} - {{ .Name }} = {{ .Value }}</li>
+        <li>{{ end }}Annotations:</li>
+        <li>{{ range .Annotations.SortedPairs }} - {{ .Name }} = {{ .Value }}</li>
+        <li>{{ end }}---</li>
+        {{ end }}
+        </ul>
+        </p>
+
+  - name: slack
+    slack_configs:
+      - send_resolved: true
+        username: '{{ template "slack.default.username" . }}'
+        color: '{{ if eq .Status "firing" }}good{{ else }}good{{ end }}'
+        title: '{{ template "slack.default.title" . }}'
+        title_link: '{{ template "slack.default.titlelink" . }}'
+        pretext: '{{ .CommonAnnotations.summary }}'
+        text:
+         >-
+          {{ range .Alerts }}
+           *Alert:* {{ .Annotations.summary }} - `{{ .Labels.severity }}`📊
+           *Description:* {{ .Annotations.description }}
+           *Details:*
+           {{ range .Labels.SortedPairs }} • *{{ .Name }}:* `{{ .Value }}`
+           {{ end }}
+          {{ end }}
